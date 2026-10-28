@@ -1,11 +1,12 @@
 /**
- * VÍ DỤ 4-2a: ĐỌC CẢM BIẾN IMU (MPU6050/6500) & TỪ TRƯỜNG (QMC5883P) QUA I2C
+ * VÍ DỤ 4-2a: ĐỌC CẢM BIẾN QUÁN TÍNH 9 TRỤC (IMU) BẰNG I2C THUẦN
  * 
  * Mô tả:
- * - Đọc trực tiếp thanh ghi thô của MPU6050/MPU6500 qua I2C để lấy dữ liệu Gia tốc & Con quay hồi chuyển.
+ * - Đọc trực tiếp thanh ghi MPU6050/MPU6500 qua I2C để lấy Gia tốc & Con quay hồi chuyển.
  * - Tính toán Góc nghiêng vệ tinh (Tilt Angle: Roll & Pitch).
- * - Đọc dữ liệu cảm biến Từ trường (Magnetometer) và tính hướng La bàn (Heading).
+ * - Đọc cảm biến Từ trường QMC5883 và tính góc hướng La bàn (Heading).
  */
+
 #include <Arduino.h>
 #include <Wire.h>
 #include <Adafruit_QMC5883P.h>
@@ -20,128 +21,125 @@ void setup() {
     Serial.begin(115200);
     while (!Serial) { delay(10); }
 
-    Serial.println("\n[RAW] Khởi tạo giao tiếp I2C cho IMU & Cảm biến Từ trường...");
-    
+    Serial.println("\n[EXAMPLE] Bắt đầu bài test Cảm biến Quán tính 9 trục (IMU)...");
+    Serial.println("[Sensor] Initializing Sensors...");
+
     // I2C mặc định trên ESP32: SDA=21, SCL=22
-    Wire.begin(21, 22); 
-    
-    // 1. Đánh thức MPU6050/MPU6500 từ chế độ Sleep (Ghi 0 vào thanh ghi PWR_MGMT_1 - 0x6B)
+    Wire.begin(21, 22);
+
+    // 1. Kiểm tra mã định danh WHO_AM_I của MPU
     Wire.beginTransmission(MPU_ADDR);
-    Wire.write(0x6B); // Thanh ghi Power Management 1
-    Wire.write(0x00); // 0 = Wake up
-    if (Wire.endTransmission(true) == 0) {
-        Serial.println("[RAW] MPU6050/6500 đã được đánh thức thành công.");
+    Wire.write(0x75);
+    Wire.endTransmission(false);
+    Wire.requestFrom((uint16_t)MPU_ADDR, (uint8_t)1);
+    uint8_t whoami = Wire.read();
+
+    if (whoami == 0x68) {
+        Serial.println("MPU6050 found!");
+    } else if (whoami == 0x70) {
+        Serial.println("MPU6500 found!");
+    } else if (whoami == 0x71) {
+        Serial.println("MPU9250 found!");
     } else {
-        Serial.println("[ERROR] Không thể kết nối tới MPU ở địa chỉ 0x68!");
+        Serial.println("MPU fail");
     }
 
-    // 2. Khởi tạo cảm biến Từ trường QMC5883P (Địa chỉ mặc định 0x2C hoặc 0x0D)
-    if (qmc.begin(0x2C)) {
-        qmcReady = true;
-        Serial.println("[RAW] Cảm biến từ trường QMC5883P đã sẵn sàng (0x2C).");
-    } else if (qmc.begin(0x0D)) {
-        qmcReady = true;
-        Serial.println("[RAW] Cảm biến từ trường QMC5883L đã sẵn sàng (0x0D).");
-    } else {
-        Serial.println("[WARN] Không tìm thấy cảm biến từ trường QMC5883 qua thư viện, thử raw I2C...");
-    }
+    // Đánh thức MPU khỏi chế độ Sleep (Ghi 0 vào thanh ghi PWR_MGMT_1 - 0x6B)
+    Wire.beginTransmission(MPU_ADDR);
+    Wire.write(0x6B);
+    Wire.write(0x00);
+    Wire.endTransmission();
 
-    if (qmcReady) {
+    // 2. Khởi tạo cảm biến từ trường QMC5883P (0x2C hoặc 0x0D)
+    if (qmc.begin(0x2C) || qmc.begin(0x0D)) {
+        qmcReady = true;
+        Serial.println("QMC5883P found!");
         qmc.setMode(QMC5883P_MODE_CONTINUOUS);
         qmc.setRange(QMC5883P_RANGE_2G);
         qmc.setODR(QMC5883P_ODR_50HZ);
+        qmc.setOSR(QMC5883P_OSR_8);
+        qmc.setDSR(QMC5883P_DSR_1);
+        qmc.setSetResetMode(QMC5883P_SETRESET_ON);
+    } else {
+        Serial.println("QMC5883P fail");
     }
 }
 
 void loop() {
-    // ------------------------------------------------------------------------
-    // 1. ĐỌC DỮ LIỆU GIA TỐC VÀ TÍNH GÓC NGHIÊNG (ROLL & PITCH) TỪ MPU
-    // ------------------------------------------------------------------------
-    // Đọc từ thanh ghi 0x3B: 6 bytes Gia tốc (ACCEL_XOUT_H -> ACCEL_ZOUT_L)
-    //                      2 bytes Nhiệt độ (TEMP_OUT_H -> TEMP_OUT_L)
-    //                      6 bytes Con quay hồi chuyển (GYRO_XOUT_H -> GYRO_ZOUT_L)
-    Wire.beginTransmission(MPU_ADDR);
-    Wire.write(0x3B);
-    Wire.endTransmission(false);
-    
-    Wire.requestFrom((uint16_t)MPU_ADDR, (uint8_t)14, (bool)true);
-    
-    if (Wire.available() >= 14) {
-        int16_t raw_ax = (Wire.read() << 8) | Wire.read();
-        int16_t raw_ay = (Wire.read() << 8) | Wire.read();
-        int16_t raw_az = (Wire.read() << 8) | Wire.read();
-        int16_t raw_temp = (Wire.read() << 8) | Wire.read();
-        int16_t raw_gx = (Wire.read() << 8) | Wire.read();
-        int16_t raw_gy = (Wire.read() << 8) | Wire.read();
-        int16_t raw_gz = (Wire.read() << 8) | Wire.read();
+    static unsigned long lastPrint = 0;
+    if (millis() - lastPrint > 1000) {
+        lastPrint = millis();
 
-        // MPU6050 mặc định dải đo ±2g (độ nhạy 16384 LSB/g)
-        float ax_g = (float)raw_ax / 16384.0;
-        float ay_g = (float)raw_ay / 16384.0;
-        float az_g = (float)raw_az / 16384.0;
+        // Đọc dữ liệu Gia tốc và Vận tốc góc từ thanh ghi MPU (0x3B, 14 bytes)
+        Wire.beginTransmission(MPU_ADDR);
+        Wire.write(0x3B);
+        Wire.endTransmission(false);
+        Wire.requestFrom((uint16_t)MPU_ADDR, (uint8_t)14, (bool)true);
 
-        // Tính Góc nghiêng (Tilt Angle): Roll và Pitch theo công thức lượng giác (đơn vị: Độ - Degree)
-        // Roll: góc lắc nghiêng quanh trục X
-        // Pitch: góc chúc/ngóc quanh trục Y
-        float roll = atan2(ay_g, az_g) * 180.0 / PI;
-        float pitch = atan2(-ax_g, sqrt(ay_g * ay_g + az_g * az_g)) * 180.0 / PI;
+        float ax = 0, ay = 0, az = 0;
+        float gx = 0, gy = 0, gz = 0;
 
-        // Con quay hồi chuyển (dải đo mặc định ±250 deg/s: 131 LSB/(deg/s))
-        float gx_dps = (float)raw_gx / 131.0;
-        float gy_dps = (float)raw_gy / 131.0;
-        float gz_dps = (float)raw_gz / 131.0;
+        if (Wire.available() >= 14) {
+            int16_t raw_ax = (Wire.read() << 8) | Wire.read();
+            int16_t raw_ay = (Wire.read() << 8) | Wire.read();
+            int16_t raw_az = (Wire.read() << 8) | Wire.read();
+            Wire.read(); Wire.read(); // Bỏ qua 2 bytes nhiệt độ
+            int16_t raw_gx = (Wire.read() << 8) | Wire.read();
+            int16_t raw_gy = (Wire.read() << 8) | Wire.read();
+            int16_t raw_gz = (Wire.read() << 8) | Wire.read();
 
-        Serial.println("==================================================");
-        Serial.println(">>> 1. GIA TỐC & GÓC NGHIÊNG (ACCELEROMETER & TILT) <<<");
-        Serial.printf("  Gia tốc thô (Raw)   : X=%6d | Y=%6d | Z=%6d\n", raw_ax, raw_ay, raw_az);
-        Serial.printf("  Gia tốc (g)         : X=%6.2f | Y=%6.2f | Z=%6.2f g\n", ax_g, ay_g, az_g);
-        Serial.printf("  => Góc nghiêng Roll (Lắc ngang)  : %6.2f°\n", roll);
-        Serial.printf("  => Góc nghiêng Pitch (Chúc/Ngóc) : %6.2f°\n", pitch);
-        Serial.printf("  Tốc độ góc Gyro     : X=%6.2f | Y=%6.2f | Z=%6.2f dps\n", gx_dps, gy_dps, gz_dps);
-    } else {
-        Serial.println("[ERROR] Không đọc được dữ liệu từ MPU6050/6500 qua I2C.");
-    }
+            // Chuyển đổi gia tốc sang m/s^2 (dải ±2g: 16384 LSB/g, 1g = 9.80665 m/s^2)
+            ax = ((float)raw_ax / 16384.0f) * 9.80665f;
+            ay = ((float)raw_ay / 16384.0f) * 9.80665f;
+            az = ((float)raw_az / 16384.0f) * 9.80665f;
 
-    // ------------------------------------------------------------------------
-    // 2. ĐỌC DỮ LIỆU TỪ TRƯỜNG & TÍNH GÓC HƯỚNG LA BÀN (MAGNETOMETER & HEADING)
-    // ------------------------------------------------------------------------
-    if (qmcReady) {
-        float mx = 0, my = 0, mz = 0;
-        if (qmc.getGaussField(&mx, &my, &mz)) {
-            // Chuyển đổi từ Gauss sang microTesla (1 Gauss = 100 uT)
-            float mx_uT = mx * 100.0;
-            float my_uT = my * 100.0;
-            float mz_uT = mz * 100.0;
-
-            // Tính góc phương vị la bàn (Yaw / Heading) từ trục từ trường X, Y
-            float heading = atan2(my, mx) * 180.0 / PI;
-            if (heading < 0) heading += 360.0;
-
-            Serial.println(">>> 2. TỪ TRƯỜNG & HƯỚNG LA BÀN (MAGNETOMETER) <<<");
-            Serial.printf("  Từ trường (Gauss)   : X=%6.3f | Y=%6.3f | Z=%6.3f G\n", mx, my, mz);
-            Serial.printf("  Từ trường (uT)      : X=%6.2f | Y=%6.2f | Z=%6.2f uT\n", mx_uT, my_uT, mz_uT);
-            Serial.printf("  => Góc hướng Heading (La bàn)    : %6.2f°\n", heading);
-        } else {
-            Serial.println("[ERROR] Lỗi khi đọc dữ liệu từ trường từ QMC5883!");
+            // Chuyển đổi vận tốc góc sang rad/s (dải ±250 deg/s: 131 LSB/(deg/s))
+            gx = ((float)raw_gx / 131.0f) * (PI / 180.0f);
+            gy = ((float)raw_gy / 131.0f) * (PI / 180.0f);
+            gz = ((float)raw_gz / 131.0f) * (PI / 180.0f);
         }
-    } else {
-        // Dự phòng đọc trực tiếp thanh ghi I2C nếu thư viện chưa nhận
-        Wire.beginTransmission(0x0D);
-        Wire.write(0x00);
-        if (Wire.endTransmission() == 0) {
-            Wire.requestFrom((uint16_t)0x0D, (uint8_t)6);
-            if (Wire.available() >= 6) {
-                int16_t qx = Wire.read() | (Wire.read() << 8);
-                int16_t qy = Wire.read() | (Wire.read() << 8);
-                int16_t qz = Wire.read() | (Wire.read() << 8);
-                float heading = atan2((float)qy, (float)qx) * 180.0 / PI;
-                if (heading < 0) heading += 360.0;
-                Serial.println(">>> 2. TỪ TRƯỜNG (RAW I2C QMC5883L 0x0D) <<<");
-                Serial.printf("  Từ trường thô: X=%d | Y=%d | Z=%d | Heading=%.2f°\n", qx, qy, qz, heading);
+
+        // Tính Góc nghiêng (Roll & Pitch)
+        float roll = atan2(ay, az) * 180.0 / PI;
+        float pitch = atan2(-ax, sqrt(ay * ay + az * az)) * 180.0 / PI;
+
+        // Đọc Từ trường (uT) và tính Heading
+        float mx = 0, my = 0, mz = 0;
+        if (qmcReady) {
+            float qx, qy, qz;
+            if (qmc.getGaussField(&qx, &qy, &qz)) {
+                // 1 Gauss = 100 microTesla (uT)
+                mx = qx * 100.0f;
+                my = qy * 100.0f;
+                mz = qz * 100.0f;
             }
         }
-    }
+        float heading = atan2(my, mx) * 180.0 / PI;
+        if (heading < 0) heading += 360.0;
 
-    Serial.println("==================================================\n");
-    delay(1000);
+        Serial.println("==================================================");
+
+        // 1. Dữ liệu Gia tốc (m/s^2)
+        Serial.println(">>> GIA TỐC (ACCELEROMETER) <<<");
+        Serial.printf("  X: %6.2f m/s^2 | Y: %6.2f m/s^2 | Z: %6.2f m/s^2\n", 
+                      ax, ay, az);
+
+        // 2. Dữ liệu Vận tốc góc (rad/s)
+        Serial.println(">>> CON QUAY HỒI CHUYỂN (GYROSCOPE) <<<");
+        Serial.printf("  X: %6.2f rad/s | Y: %6.2f rad/s | Z: %6.2f rad/s\n", 
+                      gx, gy, gz);
+
+        // 3. Góc nghiêng (Tilt Angle)
+        Serial.println(">>> GÓC NGHIÊNG (TILT ANGLE) <<<");
+        Serial.printf("  Roll (Lắc ngang)  : %6.2f° | Pitch (Chúc/Ngóc) : %6.2f°\n", 
+                      roll, pitch);
+
+        // 4. Dữ liệu Từ trường (uT) & La bàn (Heading)
+        Serial.println(">>> LA BÀN TỪ TRƯỜNG (MAGNETOMETER) <<<");
+        Serial.printf("  X: %6.2f uT    | Y: %6.2f uT    | Z: %6.2f uT    | Heading: %6.2f°\n", 
+                      mx, my, mz, heading);
+
+        Serial.println("==================================================\n");
+    }
 }
+
