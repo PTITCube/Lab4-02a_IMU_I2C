@@ -8,9 +8,13 @@
  */
 
 #include <Arduino.h>
+
+#include <PTITCube.h>
 #include <Wire.h>
 #include <Adafruit_QMC5883P.h>
 #include <math.h>
+
+PTIT_CDH cdh;
 
 #define MPU_ADDR 0x68 // Địa chỉ I2C của MPU6500
 
@@ -18,11 +22,11 @@ Adafruit_QMC5883P qmc;
 bool qmcReady = false;
 
 void setup() {
-    Serial.begin(115200);
-    while (!Serial) { delay(10); }
+    cdh.begin(115200);
+    while (!cdh) { delay(10); }
 
-    Serial.println("\n[EXAMPLE] Bắt đầu bài test Cảm biến Quán tính 9 trục (IMU)...");
-    Serial.println("[Sensor] Initializing Sensors...");
+    cdh.println("\n[EXAMPLE] Bắt đầu bài test Cảm biến Quán tính 9 trục (IMU)...");
+    cdh.println("[Sensor] Initializing Sensors...");
 
     // I2C mặc định trên ESP32: SDA=21, SCL=22
     Wire.begin(21, 22);
@@ -35,9 +39,9 @@ void setup() {
     uint8_t whoami = Wire.read();
 
     if (whoami == 0x70) {
-        Serial.println("MPU6500 found!");
+        cdh.println("MPU6500 found!");
     } else {
-        Serial.printf("MPU fail (WHO_AM_I = 0x%02X, expected 0x70 for MPU6500)\n", whoami);
+        cdh.printf("MPU fail (WHO_AM_I = 0x%02X, expected 0x70 for MPU6500)\n", whoami);
     }
 
     // Đánh thức MPU khỏi chế độ Sleep (Ghi 0 vào thanh ghi PWR_MGMT_1 - 0x6B)
@@ -49,7 +53,7 @@ void setup() {
     // 2. Khởi tạo cảm biến từ trường QMC5883P (0x2C hoặc 0x0D)
     if (qmc.begin(0x2C) || qmc.begin(0x0D)) {
         qmcReady = true;
-        Serial.println("QMC5883P found!");
+        cdh.println("QMC5883P found!");
         qmc.setMode(QMC5883P_MODE_CONTINUOUS);
         qmc.setRange(QMC5883P_RANGE_2G);
         qmc.setODR(QMC5883P_ODR_50HZ);
@@ -57,7 +61,7 @@ void setup() {
         qmc.setDSR(QMC5883P_DSR_1);
         qmc.setSetResetMode(QMC5883P_SETRESET_ON);
     } else {
-        Serial.println("QMC5883P fail");
+        cdh.println("QMC5883P fail");
     }
 }
 
@@ -113,29 +117,28 @@ void loop() {
         float heading = atan2(my, mx) * 180.0 / PI;
         if (heading < 0) heading += 360.0;
 
-        Serial.println("==================================================");
-
+        
         // 1. Dữ liệu Gia tốc (m/s^2)
-        Serial.println(">>> GIA TỐC (ACCELEROMETER) <<<");
-        Serial.printf("  X: %6.2f m/s^2 | Y: %6.2f m/s^2 | Z: %6.2f m/s^2\n", 
+        cdh.println(">>> GIA TỐC (ACCELEROMETER) <<<");
+        cdh.printf("  X: %6.2f m/s^2 | Y: %6.2f m/s^2 | Z: %6.2f m/s^2\n", 
                       ax, ay, az);
 
         // 2. Dữ liệu Vận tốc góc (rad/s)
-        Serial.println(">>> CON QUAY HỒI CHUYỂN (GYROSCOPE) <<<");
-        Serial.printf("  X: %6.2f rad/s | Y: %6.2f rad/s | Z: %6.2f rad/s\n", 
+        cdh.println(">>> CON QUAY HỒI CHUYỂN (GYROSCOPE) <<<");
+        cdh.printf("  X: %6.2f rad/s | Y: %6.2f rad/s | Z: %6.2f rad/s\n", 
                       gx, gy, gz);
 
         // 3. Góc nghiêng (Tilt Angle)
-        Serial.println(">>> GÓC NGHIÊNG (TILT ANGLE) <<<");
-        Serial.printf("  Roll (Lắc ngang)  : %6.2f° | Pitch (Chúc/Ngóc) : %6.2f°\n", 
+        cdh.println(">>> GÓC NGHIÊNG (TILT ANGLE) <<<");
+        cdh.printf("  Roll (Lắc ngang)  : %6.2f° | Pitch (Chúc/Ngóc) : %6.2f°\n", 
                       roll, pitch);
 
         // 4. Dữ liệu Từ trường (uT) & La bàn (Heading)
-        Serial.println(">>> LA BÀN TỪ TRƯỜNG (MAGNETOMETER) <<<");
-        Serial.printf("  X: %6.2f uT    | Y: %6.2f uT    | Z: %6.2f uT    | Heading: %6.2f°\n", 
+        cdh.println(">>> LA BÀN TỪ TRƯỜNG (MAGNETOMETER) <<<");
+        cdh.printf("  X: %6.2f uT    | Y: %6.2f uT    | Z: %6.2f uT    | Heading: %6.2f°\n", 
                       mx, my, mz, heading);
 
-        Serial.println("==================================================\n");
+        cdh.println("==================================================\n");
     }
 }
 
