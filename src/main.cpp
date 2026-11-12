@@ -2,7 +2,7 @@
  * VÍ DỤ 4-2a: ĐỌC CẢM BIẾN QUÁN TÍNH 9 TRỤC (IMU) BẰNG I2C THUẦN
  * 
  * Mô tả:
- * - Đọc trực tiếp thanh ghi MPU6050/MPU6500 qua I2C để lấy Gia tốc & Con quay hồi chuyển.
+ * - Đọc trực tiếp thanh ghi MPU6500 qua I2C để lấy Gia tốc & Con quay hồi chuyển.
  * - Tính toán Góc nghiêng vệ tinh (Tilt Angle: Roll & Pitch).
  * - Đọc cảm biến Từ trường QMC5883 và tính góc hướng La bàn (Heading).
  */
@@ -12,7 +12,7 @@
 #include <Adafruit_QMC5883P.h>
 #include <math.h>
 
-#define MPU_ADDR 0x68 // Địa chỉ I2C của MPU6050/MPU6500
+#define MPU_ADDR 0x68 // Địa chỉ I2C của MPU6500
 
 Adafruit_QMC5883P qmc;
 bool qmcReady = false;
@@ -27,21 +27,17 @@ void setup() {
     // I2C mặc định trên ESP32: SDA=21, SCL=22
     Wire.begin(21, 22);
 
-    // 1. Kiểm tra mã định danh WHO_AM_I của MPU
+    // 1. Kiểm tra mã định danh WHO_AM_I của MPU6500 (thanh ghi 0x75, giá trị mặc định là 0x70)
     Wire.beginTransmission(MPU_ADDR);
     Wire.write(0x75);
     Wire.endTransmission(false);
     Wire.requestFrom((uint16_t)MPU_ADDR, (uint8_t)1);
     uint8_t whoami = Wire.read();
 
-    if (whoami == 0x68) {
-        Serial.println("MPU6050 found!");
-    } else if (whoami == 0x70) {
+    if (whoami == 0x70) {
         Serial.println("MPU6500 found!");
-    } else if (whoami == 0x71) {
-        Serial.println("MPU9250 found!");
     } else {
-        Serial.println("MPU fail");
+        Serial.printf("MPU fail (WHO_AM_I = 0x%02X, expected 0x70 for MPU6500)\n", whoami);
     }
 
     // Đánh thức MPU khỏi chế độ Sleep (Ghi 0 vào thanh ghi PWR_MGMT_1 - 0x6B)
