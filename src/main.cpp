@@ -138,7 +138,7 @@ void loop() {
         cdh.printf("  X: %6.2f uT    | Y: %6.2f uT    | Z: %6.2f uT    | Heading: %6.2f°\n", 
                       mx, my, mz, heading);
 
-        cdh.println("==================================================\n");
+    
     }
 }
 
