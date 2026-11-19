@@ -16,6 +16,12 @@ bool qmcReady = false;
 
 void setup() {
     cdh.begin(115200);
+
+    // Kích hoạt GPIO 4 mức 1 để cấp dòng vào hạ áp nuôi cảm biến
+    pinMode(4, OUTPUT);
+    digitalWrite(4, HIGH);
+    delay(50);
+
     Wire.begin(21, 22);
 
     // 1. Đánh thức MPU6500 (Ghi 0 vào thanh ghi PWR_MGMT_1 - 0x6B)
