@@ -84,8 +84,9 @@ void loop() {
     if (heading < 0) heading += 360.0;
 
     // 5. In một dòng viễn trắc gọn gàng
-    cdh.printf("[IMU] Roll: %5.1f° | Pitch: %5.1f° | Head: %5.1f° | Mag: (%5.1f, %5.1f, %5.1f) uT | Acc: (%4.1f, %4.1f, %4.1f)\n",
-               roll, pitch, heading, mx, my, mz, ax, ay, az);
+    cdh.printf("Acc:  X = %5.2f, Y = %5.2f, Z = %5.2f m/s2 | Roll: %5.1f deg, Pitch: %5.1f deg\n", ax, ay, az, roll, pitch);
+    cdh.printf("Gyro: X = %5.2f, Y = %5.2f, Z = %5.2f rad/s\n", gx, gy, gz);
+    cdh.printf("Mag:  X = %5.2f, Y = %5.2f, Z = %5.2f uT | Heading: %5.1f deg\n\n", mx, my, mz, heading);
 
     delay(1000);
 }
