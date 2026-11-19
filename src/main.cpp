@@ -136,9 +136,7 @@ void loop() {
         // 4. Dữ liệu Từ trường (uT) & La bàn (Heading)
         cdh.println(">>> LA BÀN TỪ TRƯỜNG (MAGNETOMETER) <<<");
         cdh.printf("  X: %6.2f uT    | Y: %6.2f uT    | Z: %6.2f uT    | Heading: %6.2f°\n", 
-                      mx, my, mz, heading);
-
-    
+                   mx, my, mz, heading);
     }
 }
 
