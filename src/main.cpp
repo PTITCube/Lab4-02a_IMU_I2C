@@ -88,5 +88,5 @@ void loop() {
     cdh.printf("Gyro: X = %5.2f, Y = %5.2f, Z = %5.2f rad/s\n", gx, gy, gz);
     cdh.printf("Mag:  X = %5.2f, Y = %5.2f, Z = %5.2f uT | Heading: %5.1f deg\n\n", mx, my, mz, heading);
 
-    delay(1000);
+    delay(2000);
 }
