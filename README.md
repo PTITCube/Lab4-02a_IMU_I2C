@@ -18,6 +18,10 @@ Giao tiếp I2C trực tiếp với cảm biến 6-DoF MPU6500 (0x68) và từ k
 | :--- | :--- | :--- | :--- |
 | I2C SDA | GPIO 21 | 0x68 / 0x0D | Tuyến dữ liệu I2C |
 | I2C SCL | GPIO 22 | 0x68 / 0x0D | Tuyến xung nhịp I2C |
+| Buck Control | GPIO 4 | - | Bật mạch hạ áp cấp nguồn cảm biến (Bắt buộc mức HIGH) |
+
+> [!IMPORTANT]
+> Mạch phần cứng CubeSat sử dụng **GPIO 4** để điều khiển mạch hạ áp (Buck Converter) cấp nguồn cho cụm cảm biến IMU (MPU6500) và La bàn (QMC5883P). Mặc định mạch ở mức 0 (ngắt dòng). Do đó, ở các bài thực hành đọc cảm biến I2C thuần, **bắt buộc phải xuất mức 1 (HIGH) ra GPIO 4** trước khi khởi tạo `Wire` để cấp nguồn cho cảm biến hoạt động.
 
 ---
 
