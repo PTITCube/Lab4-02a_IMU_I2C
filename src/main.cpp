@@ -16,7 +16,7 @@ Adafruit_QMC5883P qmc;
 bool qmcReady = false;
 
 void setup() {
-    cdh.begin(115200);
+    cdh.begin();
 
     // Kích hoạt hạ áp nuôi cảm biến qua thư viện EPS
     eps.setBuckState(true);
