@@ -88,8 +88,11 @@ void loop() {
     float heading = atan2(my, mx) * 180.0 / PI;
     if (heading < 0) heading += 360.0;
 
-    // 5. In một dòng viễn trắc gọn gàng
-    cdh.printf("IMU: Roll: %5.1f, Pitch: %5.1f | Head: %5.1f | Acc: (%.2f, %.2f, %.2f)\n", roll, pitch, heading, ax, ay, az);
+    // 5. In 4 dòng viễn trắc chi tiết: Vận tốc góc, Gia tốc, Từ trường, Các góc Euler
+    cdh.printf("Góc nghiêng: X: %6.2f, Y: %6.2f, Z: %6.2f rad/s\n", gx, gy, gz);
+    cdh.printf("Gia tốc:     X: %6.2f, Y: %6.2f, Z: %6.2f m/s2\n", ax, ay, az);
+    cdh.printf("Từ trường:   X: %6.2f, Y: %6.2f, Z: %6.2f uT\n", mx, my, mz);
+    cdh.printf("Roll: %5.1f, Pitch: %5.1f, Head: %5.1f\n", roll, pitch, heading);
 
     delay(2000);
 }
